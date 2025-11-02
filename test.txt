@@ -1,37 +1,260 @@
-# clock_right.py
+#!/usr/bin/env python3
 import time
-from guizero import App, Box, Text
+from datetime import datetime, timedelta
+from functools import partial
 
-app = App(title="Task Timer (Step 1: Clock)", width=900, height=400)
+# GUI
+from guizero import App, Box, Text, TextBox, PushButton, Window
 
-# Placeholder for future content on the left (task list, etc.)
-left_area = Box(app, align="left", width="fill", height="fill")
+# --- Hardware (GPIO + Servo) ---
+import RPi.GPIO as GPIO
 
-# Right-side bar that stays docked to the right edge
-right_bar = Box(app, align="right", width=220, height="fill")
+SERVO_PIN = 11          # BOARD numbering
+BUTTON_PIN = 7          # Active-high with pull-down in this example
 
-# Optional: a little top padding inside the right bar
-pad = Box(right_bar, height=20, width="fill")
+GPIO.setwarnings(False)
+GPIO.setmode(GPIO.BOARD)
+GPIO.setup(SERVO_PIN, GPIO.OUT)
+GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 
-# Clock widgets
-label = Text(right_bar, text="TIME", size=10, align="right")
-clock_text = Text(
-    right_bar,
-    text="--:--:--",
-    size=36,
-    align="right",
-    font="DejaVu Sans Mono"  # monospace helps prevent jitter
-)
-date_text = Text(right_bar, text="------------", size=12, align="right")
+pwm = GPIO.PWM(SERVO_PIN, 50)   # 50Hz for hobby servo
+pwm_started = False             # track PWM init
+alarm_active = False            # a servo alarm is currently sounding
+checking_button = False         # whether we scheduled the button poll
+active_popups = []              # list[Window] currently showing
+
+def angle_to_duty(angle: float) -> float:
+    # Tweak min/max for your servo if needed
+    min_dc, max_dc = 2.5, 12.5
+    return min_dc + (max_dc - min_dc) * (angle / 180.0)
+
+def ensure_pwm():
+    global pwm_started
+    if not pwm_started:
+        pwm.start(0)
+        pwm_started = True
+
+def move_servo(angle: float, hold_s: float = 0.4):
+    ensure_pwm()
+    pwm.ChangeDutyCycle(angle_to_duty(angle))
+    time.sleep(hold_s)
+    pwm.ChangeDutyCycle(0)
+
+def trigger_servo():
+    """Start the physical alarm: nudge the servo and start polling the hardware button."""
+    global alarm_active, checking_button
+    if not alarm_active:
+        alarm_active = True
+        # Example: quick nudge. Adjust angle/hold as you like (or loop/pulse if needed).
+        move_servo(30, 0.5)
+    if not checking_button:
+        checking_button = True
+        app.repeat(100, check_hardware_button)  # poll every 100 ms
+
+def stop_servo_alarm():
+    """Stop the physical alarm and let new tasks trigger later."""
+    global alarm_active
+    pwm.ChangeDutyCycle(0)
+    alarm_active = False
+
+def check_hardware_button():
+    """Close ALL active task popups and stop alarm when the hardware button is pressed."""
+    global checking_button
+    if GPIO.input(BUTTON_PIN) == 1:  # pressed (with PUD_DOWN wiring)
+        # Stop servo and clear alarm state
+        stop_servo_alarm()
+        # Close any active popups
+        for win in list(active_popups):
+            try:
+                win.hide()
+                win.destroy()
+            except Exception:
+                pass
+            active_popups.remove(win)
+        # Stop polling until the next alarm
+        app.cancel(check_hardware_button)
+        checking_button = False
+
+def cleanup():
+    try:
+        pwm.ChangeDutyCycle(0)
+        time.sleep(0.1)
+        pwm.stop()
+    except Exception:
+        pass
+    GPIO.cleanup()
+    app.destroy()
+
+# -------------------------------
+#            GUI + Tasks
+# -------------------------------
+
+app = App(title="Task List + Clock (Pi)", width=1000, height=520)
+app.on_close(cleanup)
+
+# Layout: left = tasks, right = clock
+left = Box(app, align="left", width="fill", height="fill")
+right = Box(app, align="right", width=260, height="fill")
+
+# Right: real-time clock panel
+Text(right, text="TIME", size=10, align="right")
+clock_text = Text(right, text="--:--:--", size=40, align="right", font="DejaVu Sans Mono")
+date_text  = Text(right, text="--------------", size=12, align="right")
 
 def update_clock():
     clock_text.value = time.strftime("%H:%M:%S")
     date_text.value  = time.strftime("%a, %b %d, %Y")
 
-# Update every second
-app.repeat(1000, update_clock)
+# Left: Add Task controls + Task list
+add_box = Box(left, width="fill", height=70)
+add_box.bg = "#f5f5f5"
 
-# Prime once so it shows immediately
+Text(add_box, text="Add Task:", align="left")
+task_name_in = TextBox(add_box, text="", align="left", width=20)
+
+# Simple HH:MM controls with +/- buttons
+def z2(n): return f"{int(n):02d}"
+
+now = datetime.now()
+hour_val = [now.hour]
+min_val  = [now.minute]
+
+time_box = Box(add_box, align="left")
+PushButton(time_box, text="−", width=2, command=lambda: set_hm(hour_val[0]-1, min_val[0]))
+hour_txt = Text(time_box, text=z2(hour_val[0]), size=18)
+PushButton(time_box, text="+", width=2, command=lambda: set_hm(hour_val[0]+1, min_val[0]))
+Text(time_box, text=":", size=18)
+PushButton(time_box, text="−", width=2, command=lambda: set_hm(hour_val[0], min_val[0]-1))
+min_txt  = Text(time_box, text=z2(min_val[0]), size=18)
+PushButton(time_box, text="+", width=2, command=lambda: set_hm(hour_val[0], min_val[0]+1))
+
+def set_hm(h, m):
+    # normalize hours [0..23], minutes [0..59]
+    h = (h + 24) % 24
+    m = (m + 60) % 60
+    hour_val[0] = h
+    min_val[0]  = m
+    hour_txt.value = z2(h)
+    min_txt.value  = z2(m)
+
+# Container for task rows
+rows_box = Box(left, width="fill", height="fill")
+
+# In-memory tasks
+# each: {"id": int, "name": str, "due": datetime, "fired": bool, "row": Box}
+next_id = 1
+tasks = []
+
+def due_from_hm(h, m):
+    """Return next due datetime: today at h:m if in future, else tomorrow."""
+    now = datetime.now()
+    due = now.replace(hour=h, minute=m, second=0, microsecond=0)
+    if due <= now:
+        due += timedelta(days=1)
+    return due
+
+def add_task():
+    nonlocal next_id
+    name = task_name_in.value.strip() or "Untitled"
+    due  = due_from_hm(hour_val[0], min_val[0])
+    create_task_row(next_id, name, due)
+    next_id += 1
+    task_name_in.value = ""
+
+def create_task_row(task_id, name, due_dt):
+    """Build one editable row with name + due time + +/- buttons + delete."""
+    row = Box(rows_box, width="fill", layout="grid", border=True)
+
+    # Editable name
+    name_box = TextBox(row, text=name, grid=[0,0], width=18)
+
+    # Time display
+    due_label = Text(row, text=due_dt.strftime("%H:%M"), size=16, grid=[1,0])
+
+    # Hour +/- and Minute +/-
+    def bump_hour(delta):
+        new = (due_dt.hour + delta) % 24
+        set_due(new, due_dt.minute)
+
+    def bump_min(delta):
+        newm = (due_dt.minute + delta) % 60
+        set_due(due_dt.hour, newm)
+
+    PushButton(row, text="H−", grid=[2,0], width=3, command=lambda: bump_hour(-1))
+    PushButton(row, text="H+", grid=[3,0], width=3, command=lambda: bump_hour(+1))
+    PushButton(row, text="M−", grid=[4,0], width=3, command=lambda: bump_min(-1))
+    PushButton(row, text="M+", grid=[5,0], width=3, command=lambda: bump_min(+1))
+
+    # Delete
+    def delete_row():
+        rows_box.remove(row)
+        tasks[:] = [t for t in tasks if t["id"] != task_id]
+
+    PushButton(row, text="🗑", grid=[6,0], width=3, command=delete_row)
+
+    # Store task
+    task = {"id": task_id, "name_box": name_box, "due": due_dt, "fired": False, "row": row, "label": due_label}
+    tasks.append(task)
+
+    # Helpers to keep due time in sync
+    def set_due(h, m):
+        # preserve "next occurrence" behavior (today or tomorrow)
+        now = datetime.now()
+        new_due = now.replace(hour=h, minute=m, second=0, microsecond=0)
+        if new_due <= now:
+            new_due += timedelta(days=1)
+        task["due"] = new_due
+        task["label"].value = new_due.strftime("%H:%M")
+
+    # expose to inner funcs
+    nonlocal due_dt
+    def update_due_ref(new_due):
+        nonlocal due_dt
+        due_dt = new_due
+
+    # wrap set_due to also update the closure copy
+    old_set_due = set_due
+    def set_due(h, m):
+        old_set_due(h, m)
+        update_due_ref(task["due"])
+
+    # replace closures
+    bump_hour.__defaults__ = (None,)
+    bump_min.__defaults__  = (None,)
+
+# Add button (uses the hour/min set above)
+PushButton(add_box, text="Add Task", align="left", command=add_task)
+
+# Clock + due checker
+def tick():
+    # Update right-side clock
+    update_clock()
+
+    # Check tasks
+    now = datetime.now()
+    for t in tasks:
+        if not t["fired"] and now >= t["due"]:
+            t["fired"] = True
+            show_task_popup(t)
+
+def show_task_popup(task):
+    """Show a modal popup for the task and trigger servo alarm."""
+    title = f"Task Due"
+    msg   = f"⏰ {task['name_box'].value.strip() or 'Task'} is due now!"
+
+    # Create a small modal popup without manual dismiss
+    win = Window(app, title=title, width=360, height=160)
+    win.when_closed = lambda: win.show()  # prevent closing via [X]; reopen
+    Box(win, height=10)  # spacer
+    Text(win, text=msg, size=16)
+    Text(win, text="Press the hardware button to dismiss.", size=10)
+    active_popups.append(win)
+
+    # Fire hardware
+    trigger_servo()
+
+# Kick things off
 update_clock()
+app.repeat(1000, tick)
 
 app.display()
