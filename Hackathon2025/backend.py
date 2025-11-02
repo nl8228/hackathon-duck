@@ -32,7 +32,7 @@ def angle_to_duty(angle):
 def stop_alarm():
     """Return servo, stop beeper/LED, etc."""
     try:
-        pwm.ChangeDutyCycle(angle_to_duty(0))
+        pwm.ChangeDutyCycle(angle_to_duty(90))
     except Exception:
         pass
     GPIO.output(ALARM_PIN, GPIO.LOW)
@@ -99,10 +99,7 @@ def trigger_servo():
     pause_resume_button.hide()
     status_text.value = "Close Duck Head to stop."
     GPIO.output(ALARM_PIN, GPIO.HIGH)
-    try:
-        pwm.start(angle_to_duty(180))
-    except Exception:
-        pwm.ChangeDutyCycle(angle_to_duty(180))
+    pwm.start(angle_to_duty(0))
     time.sleep(0.5)
     # poll the hardware button until user presses it
     app.repeat(100, check_hardware_button)  # every 100 ms
@@ -223,3 +220,4 @@ update_time_display()
 show_timer_controls()
 
 app.display()
+
