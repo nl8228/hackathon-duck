@@ -1,15 +1,16 @@
+#computational code was human written and computed while guizero code and bug fixes was ai generated
 import time
 import RPi.GPIO as GPIO
 import requests
 from guizero import App, Box, Text, PushButton
 from functools import partial
 
-# --- Hardware Configuration ---
+#hardware configs
 SERVO_PIN  = 11
 BUTTON_PIN = 7
 ALARM_PIN  = 37
 
-# --- GPIO Setup ---
+#GPIO setup
 GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BOARD)
 GPIO.setup(SERVO_PIN, GPIO.OUT)
@@ -18,13 +19,12 @@ GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)  # internal pull-dow
 pwm = GPIO.PWM(SERVO_PIN, 50)  # 50Hz for typical servo
 GPIO.output(ALARM_PIN, GPIO.LOW)
 
-# --- Global timer state ---
 timer_minutes = 0
 timer_seconds = 0
 total_seconds = 0
 is_paused = False
 
-# ---------------- Hardware helpers ----------------
+#helper func for hardware
 def angle_to_duty(angle):
     """Convert a servo angle to a PWM duty cycle."""
     return 2 + (angle / 18)
@@ -47,7 +47,7 @@ def cleanup():
         # guizero handles window teardown
         pass
 
-# ---------------- GUI callbacks ----------------
+#gui callbacks
 def update_time_display():
     """Refresh the 00:00 labels in the setup view."""
     minutes_text.value = f"{timer_minutes:02d}"
@@ -161,7 +161,7 @@ def reset_gui():
     stop_alarm()
     show_timer_controls()
 
-# ------------------- GUI layout -------------------
+#guizero layout
 app = App(title="Timer", width=400, height=250)
 app.when_closed = cleanup  # ensure GPIO cleanup on exit
 
@@ -220,5 +220,6 @@ update_time_display()
 show_timer_controls()
 
 app.display()
+
 
 
