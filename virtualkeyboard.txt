@@ -1,0 +1,13 @@
+mkdir -p ~/Desktop ~/.local/share/applications
+cat > ~/Desktop/OnScreenKeyboard.desktop << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=On-Screen Keyboard
+Comment=Launch the virtual keyboard
+Exec=onboard
+Icon=keyboard
+Terminal=false
+Categories=Utility;
+EOF
+chmod +x ~/Desktop/OnScreenKeyboard.desktop
+cp ~/Desktop/OnScreenKeyboard.desktop ~/.local/share/applications/
