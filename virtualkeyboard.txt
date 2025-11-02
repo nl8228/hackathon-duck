@@ -1,13 +1,17 @@
 mkdir -p ~/Desktop ~/.local/share/applications
-cat > ~/Desktop/OnScreenKeyboard.desktop << 'EOF'
+cat > ~/Desktop/Run-Backend.desktop << 'EOF'
 [Desktop Entry]
 Type=Application
-Name=On-Screen Keyboard
-Comment=Launch the virtual keyboard
-Exec=onboard
-Icon=keyboard
-Terminal=false
+Name=Timer
+Comment=Launch backend.py
+# If you added the shebang + chmod +x, use:
+# Exec=/home/robopong/Hackathon/backend.py
+# Otherwise call python3 explicitly:
+Exec=/usr/bin/python3 /home/robopong/Hackathon/backend.py
+Path=/home/robopong/Hackathon
+Terminal=true
+Icon=utilities-terminal
 Categories=Utility;
 EOF
-chmod +x ~/Desktop/OnScreenKeyboard.desktop
-cp ~/Desktop/OnScreenKeyboard.desktop ~/.local/share/applications/
+chmod +x ~/Desktop/Run-Backend.desktop
+cp ~/Desktop/Run-Backend.desktop ~/.local/share/applications/
