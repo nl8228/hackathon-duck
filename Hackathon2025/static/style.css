@@ -1,0 +1,107 @@
+html, body { height: 100%; margin: 0; }
+
+body{
+  display: flex;
+  min-height: 100dvh;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+
+  background: url("/static/duckderbybackground.webp") center / cover no-repeat fixed;
+
+  font-family: system-ui, sans-serif;
+  position: relative;
+}
+
+body::before{
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);   /* adjust 0.25–0.5 */
+  pointer-events: none;
+}
+
+h1 { margin: 0 0 16px; }
+form { display: inline-flex; gap: 0.5rem; align-items: center; }
+
+label {
+  color: white;
+  font-size: 16px;
+  font-weight: 500;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+input.field {
+  padding: 6px 10px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  font-size: 16px;
+  background: rgba(255,255,255,0.9);
+}
+#seconds { width: 120px; }
+#alarm_name { width: 280px; }
+
+button {
+  background-color: #4a90e2;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #357abd;
+}
+
+.title{
+  font: 900 clamp(2rem, 6.2vw, 5rem)/1.08 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  letter-spacing: .25px;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  background-image: url("/static/duckderby.jpg");
+  background-size: 200% auto;
+  background-position: 0% 50%;
+  background-repeat: repeat;
+
+  filter: brightness(1.5) contrast(1.1) saturate(1.2);
+
+  text-shadow:
+    0 2px 6px rgba(158, 154, 154, 0.55),
+    0 0 18px rgba(21, 19, 19, 0.35);
+  -webkit-text-stroke: 1px rgba(0,0,0,0.25);
+  animation: animate-background 12s linear infinite;
+}
+
+.panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  background: rgba(0,0,0,0.28);
+  color: #fff;
+  backdrop-filter: blur(4px);
+  text-align: center;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+}
+
+.actions { margin-top: 8px; }
+a.btn, .btn {
+  display: inline-block;
+  background: #4a90e2;
+  color: #fff;
+  text-decoration: none;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+a.btn:hover, .btn:hover { background: #357abd; }
+
+
+@keyframes animate-background{
+  0%{ background-position: 0% 50%; }
+  100%{ background-position: 100% 50%; }
+}
+
+

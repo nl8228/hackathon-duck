@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="/static/style.css?v=3">
+  <meta charset="UTF-8">
+  <title>Duck Alarm</title>
+</head>
+<body>
+  <h1 class="title">Duck Alarm</h1>
+
+  <form method="post" action="/api/alarm">
+    <label for="seconds">Seconds:</label>
+    <input id="seconds" name="seconds" type="number" min="1" step="1" required class="field" />
+
+    <label for="alarm_name">Alarm Name:</label>
+    <input id="alarm_name" name="alarm_name" type="text" class="field" />
+
+    <button type="submit">Send</button>
+  </form>
+</body>
+</html>
