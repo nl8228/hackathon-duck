@@ -33,23 +33,15 @@ def trigger_servo():
     timer_display.value = "ALARM ACTIVE"
     status_text.value = "Press hardware button to stop."
     
-    pwm.start(angle_to_duty(30))
+    pwm.start(angle_to_duty(180))
     time.sleep(0.5)
     
     # CRITICAL: Instead of a blocking while loop, we schedule a function to check the button
     app.repeat(100, check_hardware_button) # Check for button press every 100ms
 
 def stop_alarm():
-    print("Button pressed. Stopping alarm and moving servo to 0.")
-    try:
-        requests.post("http://127.0.0.1:8000/api/go-home", timeout=2)
-        print("Sent 'go-home' signal to API.")
-    except requests.exceptions.RequestException as e:
-        print(f"Could not send API signal: {e}")
-    
     pwm.ChangeDutyCycle(angle_to_duty(0))
     time.sleep(0.5)
-    pwm.stop()
 
 def cleanup():
     print("Cleaning up GPIO.")
@@ -148,3 +140,4 @@ status_text = Text(app, text="Set the timer duration.")
 # --- Initial State ---
 update_time_display()
 app.display()
+
